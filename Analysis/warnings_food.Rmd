@@ -1,0 +1,76 @@
+---
+title: "food_warning"
+output: html_document
+date: "2023-06-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# 食品警示：对于高盐、高糖或高脂肪的麦当劳食品，分析它们是否超过了某些年龄和性别群体的推荐摄入量，并提供警告。
+library(ggplot2)
+library(dplyr)
+food_data  <- read.csv("menu.csv", check.names = FALSE)
+intake_recommendations  <- read.csv("Gender_age.csv")
+```
+
+```{r}
+max_salt <- intake_recommendations["Sodium, mg", col_name]
+max_salt
+age_gender_columns <- colnames(intake_recommendations)[2:ncol(intake_recommendations)]
+age_gender_columns
+```
+
+
+
+```{r}
+# 根据数据计算哪些食品超过了推荐摄入量
+warnings <- data.frame()
+
+age_gender_columns <- colnames(intake_recommendations)[-1] # 忽略"Type"列
+
+for (i in 1:nrow(food_data)) {
+  for (col_name in age_gender_columns) {
+    max_salt <- as.numeric(intake_recommendations[intake_recommendations$Type == "Sodium, mg", col_name])
+    max_carbs <- as.numeric(intake_recommendations[intake_recommendations$Type == "Carbohydrate, g", col_name])
+    max_fat_percent <- as.numeric(sub(".*--", "", intake_recommendations[intake_recommendations$Type == "Total fat, %kcal", col_name]))
+    
+    # 检查值是否存在并且是数字
+    if (!is.na(food_data$Sodium[i]) && !is.na(max_salt) &&
+        !is.na(food_data$Sugars[i]) && !is.na(max_carbs) &&
+        !is.na(food_data$`Total Fat`[i]) && !is.na(max_fat_percent) &&
+        is.numeric(food_data$Sodium[i]) && is.numeric(max_salt) &&
+        is.numeric(food_data$Sugars[i]) && is.numeric(max_carbs) &&
+        is.numeric(food_data$`Total Fat`[i]) && is.numeric(max_fat_percent)) {
+      
+      max_fat_grams <- (max_fat_percent / 100) * food_data$Calories[i] / 9
+      
+      if (food_data$Sodium[i] > max_salt ||
+          food_data$Sugars[i] > max_carbs ||
+          food_data$`Total Fat`[i] > max_fat_grams) {
+        
+        age_gender_group <- col_name
+        warning <- data.frame(
+          food = food_data$Item[i],
+          age_gender_group = age_gender_group
+        )
+        warnings <- rbind(warnings, warning)
+      }
+    }
+  }
+}
+
+```
+
+
+
+```{r}
+# 使用ggplot2生成图像
+plot <- ggplot(warnings, aes(x = food, fill = age_gender_group)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "食品超过推荐摄入量的警告", x = "食品", y = "警告数量")
+
+# 保存图像到本地文件
+ggsave(filename = "warnings_plot.png", plot = plot, width = 10, height = 6, dpi = 300)
+```
+
