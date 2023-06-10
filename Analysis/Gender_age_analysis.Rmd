@@ -1,0 +1,115 @@
+---
+title: "Gender_age_analysis"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(stringr)
+menu <- read.csv("menu.csv", check.names = FALSE)
+gender_age <- read.csv("Gender_age.csv")
+
+```
+
+
+
+归类dataset。
+```{r}
+female_columns <- names(gender_age)[grepl("female", names(gender_age), ignore.case = TRUE)]
+female_columns <- c( "Type",female_columns)
+male_columns <- setdiff(names(gender_age),female_columns)
+male_columns <- c("Type", male_columns)
+female <- gender_age[,female_columns]
+male <- gender_age[,male_columns]
+female_subset <- female[-2,-1]
+male_subset <- male[-2,-1]
+female_subset <- apply(female_subset, 2, as.numeric)
+male_subset <-apply(male_subset, 2, as.numeric)
+age <- (female_subset+male_subset)/2
+age <- cbind(gender_age[-2,1], age)
+colnames(age) <- c("Types","4-8","9-13","14-18","19-30","31-50","51")
+```
+Sodium, Protein, Vitamin A, Vitamin C 都是随着年龄的增长，需求增加。
+Carbohydrate 和 Fat是不变。
+Calcium和 Iron是婴儿时期需求大，后面需求变小再变大，是一个波浪形,可以画个图来说明。
+```{r}
+
+library(ggplot2)
+
+# 创建数据框
+age <- c("4-8", "9-13", "14-18", "19-30", "31-50", "51")
+calcium <- c(1000, 1300, 1300, 1000, 1000, 1200)
+iron <- c(10, 8, 13, 13, 13, 8)
+data <- data.frame(age, calcium, iron)
+
+# 将age转换为有序因子，顺序为原始的age顺序
+data$age <- factor(data$age, levels = age)
+
+# 绘制折线图
+ggplot(data, aes(x = age, y = calcium, group = 1)) +
+  geom_line(color = "blue", size = 1) +
+  geom_point(color = "blue", size = 3) +
+  labs(x = "Age", y = "Calcium (mg)", title = "Calcium Intake by Age") +
+  theme_minimal()
+
+# 绘制Iron的折线图
+ggplot(data, aes(x = age, y = iron, group = 1)) +
+  geom_line(color = "red", size = 1) +
+  geom_point(color = "red", size = 3) +
+  labs(x = "Age", y = "Iron (mg)", title = "Iron Intake by Age") +
+  theme_minimal()
+
+```
+男女的摄入量差异在各个年龄段都差不多，因此以19-30岁的来分析。
+```{r}
+female_sample <- cbind(female$Type,female$female.19.30)
+male_sample <- cbind(male$Type,male$male.19.30)
+```
+通过表格，我们摘取了主要差异的项目来画柱状图。
+
+```{r}
+# 创建两个数据框
+female_sample <- data.frame(
+  Category = c("Calorie", "Dietary Fiber", "Protein", "Vitamin A", "Vitamin C", "Iron"),
+  Value = c(2000, 28, 46, 700, 75, 18)
+)
+
+male_sample <- data.frame(
+  Category = c("Calorie", "Dietary Fiber", "Protein", "Vitamin A", "Vitamin C", "Iron"),
+  Value = c(2400, 33.6, 56, 900, 90, 8)
+)
+
+# 设置绘图参数
+par(mfrow = c(2, 3))  # 将图形分为2行3列的布局
+colors <- c("#1f77b4", "#ff7f0e")
+# 循环绘制柱状图
+for (i in 1:6) {
+  # 获取当前对比的两个指标名称
+  col1 <- female_sample$Category[i]
+  col2 <- male_sample$Category[i]
+  
+  # 获取当前对比的两个指标值
+  value1 <- as.numeric(female_sample$Value[i])
+  value2 <- as.numeric(male_sample$Value[i])
+  
+  # 创建柱状图
+  barplot(height = c(value1, value2),
+          names.arg = c("Female", "Male"),
+          main = paste(col1, "vs", col2),
+          xlab = "Data",
+          ylab = "Value",
+          col = colors)
+}
+
+
+
+```
+
+
+
+除了铁元素以外，其他的（xx,xx,xx,xx）都是男性的摄入量比较高。
+
+接着我们可以分析一下对19-30岁的男性和女性，哪款麦当劳产品最适合。
+
