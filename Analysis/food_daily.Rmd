@@ -1,0 +1,77 @@
+---
+title: "food_daily"
+output: html_document
+date: "2023-06-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+# 读取数据
+mcdonalds_menu <- read.csv("menu.csv", check.names = FALSE)
+intake_recommendations  <- read.csv("Average_adult.csv")
+#其中把Sodium值改为了mg
+```
+
+
+
+```{r}
+#这个程序用Sodium营养值作为参考
+generate_menu <- function(age_gender_column, intake_data, menu_data, tolerance) {
+  # 获取推荐的摄入量
+  max_calories <- as.numeric(intake_data[intake_data$Type == age_gender_column, "Calories"])
+  max_sodium <- as.numeric(intake_data[intake_data$Type == age_gender_column, "Sodium"])
+  
+  # 初始化餐单和当前摄入量
+  selected_menu <- data.frame()
+  current_calories <- 0
+  current_sodium <- 0
+  
+  # 记录已选择的类别
+  selected_categories <- c()
+  
+  # 在mcdonalds_menu中循环搜索食品
+  for (i in 1:nrow(menu_data)) {
+    item_calories <- menu_data$Calories[i]
+    item_sodium <- menu_data$Sodium[i]
+    item_category <- menu_data$Category[i]
+    
+    # 检查食品的卡路里和钠是否为缺失值
+    if (!is.na(item_calories) && !is.na(item_sodium)) {
+      # 检查是否超过推荐摄入量并且该类别还没有被选择
+      if (current_calories + item_calories <= max_calories && !(item_category %in% selected_categories)) {
+        # 添加食品到餐单
+        selected_menu <- rbind(selected_menu, menu_data[i, ])
+        current_calories <- current_calories + item_calories
+        current_sodium <- current_sodium + item_sodium
+
+        # 将此类别添加到已选择的类别列表中
+        selected_categories <- c(selected_categories, item_category)
+        
+        # 检查是否超过容忍范围
+        if (abs(current_calories - max_calories) <= tolerance || abs(current_sodium - max_sodium) <= tolerance) {
+          break
+        }
+      }
+    }
+  }
+  
+  return(selected_menu)
+}
+
+
+# 为 average_adult 生成餐单
+selected_menu <- generate_menu("average_adult", intake_recommendations, mcdonalds_menu, 200)
+
+# 显示选择的项目
+selected_menu
+
+
+# 显示总卡路里和钠
+cat(sprintf("Total Calories: %d, Total Sodium: %d\n", sum(selected_menu$Calories), sum(selected_menu$Sodium)))
+
+# 结论：如果只为了卡路里去搭配麦当劳的食物，会造成其他的营养不平衡，例如Sodium过量等。
+
+```
+
+
