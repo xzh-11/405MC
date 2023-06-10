@@ -1,0 +1,103 @@
+```{r}
+library(ggplot2)
+GA <- read.csv("GA.csv", check.names = FALSE)
+```
+
+
+## 卡路里和不同年龄性别的关系
+```{r}
+
+
+# 创建数据框
+df_female <- data.frame(
+  AgeGroup = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+"),
+  Calorie = c(1200, 1400, 1600, 1800, 1800, 1600),
+  Gender = "Female"
+)
+
+df_male <- data.frame(
+  AgeGroup = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+"),
+  Calorie = c(1400, 1600, 1800, 2200, 2200, 2000),
+  Gender = "Male"
+)
+
+df <- rbind(df_female, df_male)
+
+# 绘制折线图
+ggplot(data = df, aes(x = AgeGroup, y = Calorie, group = Gender, color = Gender)) +
+  geom_line(linetype = "solid", size = 1.5) +
+  geom_point(size = 3) +
+  geom_text(aes(label = Calorie), vjust = -0.8, size = 3.5) +
+  labs(x = "Age Group", y = "Calorie Level") +
+  scale_x_discrete(limits = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+")) +
+  scale_y_continuous(limits = c(1000, 2500), breaks = seq(1000, 2500, 200)) +
+  ggtitle("Calorie Level Assessment for Different Age Groups") +
+  theme_minimal() +
+  scale_color_manual(values = c("Female" = "red", "Male" = "blue")) +
+  labs(color = "Gender")
+
+```
+## 蛋白质摄入和不同年龄性别的关系
+```{r}
+df_female <- data.frame(
+  AgeGroup = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+"),
+  Protein = c(19, 34, 46, 46, 46, 46),
+  Gender = "Female"
+)
+
+df_male <- data.frame(
+  AgeGroup = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+"),
+  Protein = c(19, 34, 52, 56, 56, 56),
+  Gender = "Male"
+)
+
+df <- rbind(df_female, df_male)
+
+# 绘制折线图
+ggplot(data = df, aes(x = AgeGroup, y = Protein, group = Gender, color = Gender)) +
+  geom_line(linetype = "solid", size = 1.5) +
+  geom_point(size = 3) +
+  geom_text(aes(label = Protein), vjust = -0.8, size = 3.5) +
+  labs(x = "Age Group", y = "Protein Intake (g)") +
+  scale_x_discrete(limits = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+")) +
+  scale_y_continuous(limits = c(0, 60), breaks = seq(0, 60, 10)) +
+  ggtitle("Protein Intake for Females and Males in Different Age Groups") +
+  theme_minimal() +
+  scale_color_manual(values = c("Female" = "red", "Male" = "blue")) +
+  labs(color = "Gender")
+
+```
+
+## 膳食纤维和不同年龄性别的关系
+```{r}
+df_female <- data.frame(
+  AgeGroup = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+"),
+  DietaryFiber = c(16.8, 22.4, 25.2, 25.2, 25.2, 22.4),
+  Gender = "Female"
+)
+
+df_male <- data.frame(
+  AgeGroup = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+"),
+  DietaryFiber = c(19.6, 25.2, 30.8, 33.6, 30.8, 28),
+  Gender = "Male"
+)
+
+df <- rbind(df_female, df_male)
+
+# 绘制折线图
+ggplot(data = df, aes(x = AgeGroup, y = DietaryFiber, group = Gender, color = Gender)) +
+  geom_line(linetype = "solid", size = 1.5) +
+  geom_point(size = 3) +
+  geom_text(aes(label = DietaryFiber), vjust = -0.8, size = 3.5) +
+  labs(x = "Age Group", y = "Dietary Fiber Intake (g)") +
+  scale_x_discrete(limits = c("4 - 8", "9-13", "14-18", "19-30", "31-50", "51+")) +
+  scale_y_continuous(limits = c(0, 40), breaks = seq(0, 40, 5)) +
+  ggtitle("Dietary Fiber Intake for Females and Males in Different Age Groups") +
+  theme_minimal() +
+  scale_color_manual(values = c("Female" = "red", "Male" = "blue")) +
+  labs(color = "Gender")
+
+```
+
+
+
