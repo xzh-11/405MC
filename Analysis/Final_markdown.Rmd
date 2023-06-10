@@ -1,0 +1,432 @@
+---
+title: "Mcd"
+author: "Hao Zheng"
+date: "2023-06-08"
+output: pdf_document
+---
+
+```{r}
+library(tidyverse)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+```
+
+Data process
+
+http://www.mydailyintake.net/daily-intake-levels/
+https://www.kaggle.com/datasets/mcdonalds/nutrition-facts
+https://health.gov/sites/default/files/2019-09/Appendix-E3-1-Table-A4.pdf
+
+因为麦当劳数据 里面的维他命只有% Daily value.我查了网上标准算成mg unit
+
+```{r}
+##########    MC Nutr
+df <- read.csv("menu.csv", check.names = FALSE)
+df <- df %>% select(Category, Item, 'Calories from Fat','Trans Fat',`Serving Size`, Calories, `Total Fat`, `Saturated Fat`, 
+                    Sodium, Carbohydrates, `Dietary Fiber`, Protein, Sugars, `Vitamin A (% Daily Value)`, 
+                    `Vitamin C (% Daily Value)`, `Calcium (% Daily Value)`, `Iron (% Daily Value)`)
+
+######Change the some % in the data to mg. Time these percentage with the serving mg
+#Get the Daily mg value needed by human adult from internet, trans them into mg
+cols <- c('Vitamin A (% Daily Value)', 'Vitamin C (% Daily Value)', 'Calcium (% Daily Value)', 'Iron (% Daily Value)')
+df['Vitamin A (% Daily Value)'] <- df['Vitamin A (% Daily Value)']*900*0.01
+df['Vitamin C (% Daily Value)'] <- df['Vitamin C (% Daily Value)']*90*0.01
+df['Calcium (% Daily Value)'] <- df['Calcium (% Daily Value)']*1300*0.01
+df['Iron (% Daily Value)'] <- df['Iron (% Daily Value)']*18*0.01
+#######Change name of % to mg
+
+MC <- df %>% rename_with(~str_replace(., " \\(% Daily Value\\)", ""), cols)
+names(MC) <- gsub(" ", "_", names(MC))
+print(MC)
+write.csv(MC, "new_menu.csv", row.names = FALSE)
+# Save into MC
+```
+
+
+```{r}
+##########Average People
+df <- read.csv("Average_adult.csv", check.names = FALSE)
+names(df) <- gsub(" ", "_", names(df))
+Adult <- df
+print(Adult)
+Adult <- df
+print(Adult)
+write.csv(Adult, "new_Average.csv", row.names = FALSE)
+#Save in Adult
+```
+
+同理 这里面的saltfat  和 Total fat只有 %kcal.  一样算成了mg为单位
+Sodium, Vitamin,Calcium,Iron In mg 其他都是in g
+```{r}
+#########Age_gender
+df <- read.csv("Gender_age.csv", check.names = FALSE)
+
+# Transpose
+df_transposed <- as.data.frame(t(df))
+colnames(df_transposed) <- df_transposed[1,]
+df_transposed <- df_transposed[-1, ]
+
+# Replace values in "Total fat, %kcal"
+df_transposed$`Total fat, %kcal` <- sapply(str_split(df_transposed$`Total fat, %kcal`, "--"), 
+                                           function(x) mean(as.numeric(x)))
+#trans %kcal into mg
+df_transposed$`Total fat, %kcal` <- round(as.numeric(df_transposed$`Total fat, %kcal`) / 100 * as.numeric(df_transposed$`Calorie level(s) assessed Macronutrients`) / 9, digits = 1)
+
+df_transposed$`Saturated fat, %kcal` <- round(as.numeric(df_transposed$`Saturated fat, %kcal`) / 100 * as.numeric(df_transposed$`Calorie level(s) assessed Macronutrients`) / 9, digits = 1)
+
+#rename
+colnames(df_transposed)[colnames(df_transposed) == 'Calorie level(s) assessed Macronutrients'] <- 'Calories'
+colnames(df_transposed)[colnames(df_transposed) == 'Total fat, %kcal'] <- 'Total Fat'
+colnames(df_transposed)[colnames(df_transposed) == 'Saturated fat, %kcal'] <- 'Saturated Fat'
+colnames(df_transposed)[colnames(df_transposed) == 'Sodium, mg'] <- 'Sodium'
+colnames(df_transposed)[colnames(df_transposed) == 'Carbohydrate, g'] <- 'Carbohydrates'
+colnames(df_transposed)[colnames(df_transposed) == 'Dietary Fiber, g'] <- 'Dietary Fiber'
+colnames(df_transposed)[colnames(df_transposed) == 'Protein, g'] <- 'Protein'
+colnames(df_transposed)[colnames(df_transposed) == 'Vitamin A, mg_RAE'] <- 'Vitamin A'
+colnames(df_transposed)[colnames(df_transposed) == 'Vitamin C, mg'] <- 'Vitamin C'
+colnames(df_transposed)[colnames(df_transposed) == 'Calcium, mg'] <- 'Calcium'
+colnames(df_transposed)[colnames(df_transposed) == 'Iron, mg'] <- 'Iron'
+
+names(df_transposed) <- gsub(" ", "_", names(df_transposed))
+
+Gender_age <- df_transposed
+print(Gender_age)
+write.csv(Gender_age, "new_Gender_age.csv", row.names = FALSE)
+#######Result save into MC, Adult, Gender_age
+```
+
+
+
+```{r}
+####################################### Keep the most usual order by the customers 
+#Delete the row of the goods contains small, large
+MC <- MC[!(grepl("Small", MC$Item) | grepl("Large", MC$Item) | grepl("Child", MC$Item) |grepl("Snack", MC$Item)|grepl("4 piece", MC$Item)|grepl("6 piece", MC$Item) |grepl("20 piece", MC$Item)|grepl("40 piece", MC$Item)), ]
+
+#Sepreate the Category. Rename them into new data.frame
+
+list_of_dataframes <- split(MC, MC$Category)
+for(i in seq_along(list_of_dataframes)) {
+    new_name <- gsub(" ", "_", paste0(names(list_of_dataframes)[i], "_MC"))
+    new_name <- gsub("&_", "", new_name)
+    assign(new_name, list_of_dataframes[[i]], envir = .GlobalEnv)}
+
+ls()
+```
+
+
+
+Adult vs MC
+```{r}
+###########################################################################  Analysis part ###################################
+###This chunk finds out the comparsion between each MC dataset with the Adult dataset
+
+
+# Add the 'Adult' data to the 'MC' data frame for comparison
+Breakfast_MC$Adult_Calories <- Adult$Calories[1]
+
+# Create bar plot
+ggplot(Breakfast_MC, aes(x = Item)) +
+  geom_bar(aes(y = Calories), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+  geom_bar(aes(y = Adult_Calories), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+  labs(title = "Breakfast Calorie Comparison", x = "Item", y = "Calories") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max(Breakfast_MC$Adult_Calories) + 200)) +
+  geom_text(aes(y = Calories, label = Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  geom_text(aes(y = Adult_Calories, label = Adult_Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Legend", labels = c("Item", "Average Adult")) +
+  coord_flip() 
+
+Breakfast_MC <- dplyr::select(Breakfast_MC, -Adult_Calories)
+
+#################################################################
+# Beef_pork
+Beef_Pork_MC$Adult_Calories <- Adult$Calories[1]
+
+ggplot(Beef_Pork_MC, aes(x = Item)) +
+  geom_bar(aes(y = Calories), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+  geom_bar(aes(y = Adult_Calories), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+  labs(title = "Beef_pork Calorie Comparison", x = "Item", y = "Calories") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max(Beef_Pork_MC$Adult_Calories) + 200)) +
+  geom_text(aes(y = Calories, label = Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  geom_text(aes(y = Adult_Calories, label = Adult_Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Legend", labels = c("Item", "Average Adult")) +
+  coord_flip() 
+
+Beef_Pork_MC <- dplyr::select(Beef_Pork_MC, -Adult_Calories)
+
+###############################################################
+# Chicken_Fish
+Chicken_Fish_MC$Adult_Calories <- Adult$Calories[1]
+
+ggplot(Chicken_Fish_MC, aes(x = Item)) +
+  geom_bar(aes(y = Calories), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+  geom_bar(aes(y = Adult_Calories), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+  labs(title = "Chicken_Fish Calorie Comparison", x = "Item", y = "Calories") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max(Chicken_Fish_MC$Adult_Calories) + 200)) +
+  geom_text(aes(y = Calories, label = Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  geom_text(aes(y = Adult_Calories, label = Adult_Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Legend", labels = c("Item", "Average Adult")) +
+  coord_flip() 
+
+Chicken_Fish_MC <- dplyr::select(Chicken_Fish_MC, -Adult_Calories)
+
+###############################################################
+# Salads
+Salads_MC$Adult_Calories <- Adult$Calories[1]
+
+ggplot(Salads_MC, aes(x = Item)) +
+  geom_bar(aes(y = Calories), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+  geom_bar(aes(y = Adult_Calories), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+  labs(title = "Salads Calorie Comparison", x = "Item", y = "Calories") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max(Salads_MC$Adult_Calories) + 200)) +
+  geom_text(aes(y = Calories, label = Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  geom_text(aes(y = Adult_Calories, label = Adult_Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Legend", labels = c("Item", "Average Adult")) +
+  coord_flip() 
+
+Salads_MC <- dplyr::select(Salads_MC, -Adult_Calories)
+
+###############################################################
+# Snacks_Sides
+Snacks_Sides_MC$Adult_Calories <- Adult$Calories[1]
+
+ggplot(Snacks_Sides_MC, aes(x = Item)) +
+  geom_bar(aes(y = Calories), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+  geom_bar(aes(y = Adult_Calories), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+  labs(title = "Snacks_Sides Calorie Comparison", x = "Item", y = "Calories") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max(Snacks_Sides_MC$Adult_Calories) + 200)) +
+  geom_text(aes(y = Calories, label = Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  geom_text(aes(y = Adult_Calories, label = Adult_Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Legend", labels = c("Item", "Average Adult")) +
+  coord_flip() 
+
+Snacks_Sides_MC <- dplyr::select(Snacks_Sides_MC, -Adult_Calories)
+
+###############################################################
+# Coffee_Tea
+Coffee_Tea_MC$Adult_Calories <- Adult$Calories[1]
+
+ggplot(Coffee_Tea_MC, aes(x = Item)) +
+  geom_bar(aes(y = Calories), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+  geom_bar(aes(y = Adult_Calories), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+  labs(title = "Coffee_Tea Calorie Comparison", x = "Item", y = "Calories") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max(Coffee_Tea_MC$Adult_Calories) + 200)) +
+  geom_text(aes(y = Calories, label = Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  geom_text(aes(y = Adult_Calories, label = Adult_Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Legend", labels = c("Item", "Average Adult")) +
+  coord_flip() 
+
+Coffee_Tea_MC <- dplyr::select(Coffee_Tea_MC, -Adult_Calories)
+
+###############################################################
+# Smoothies_Shakes 
+Smoothies_Shakes_MC$Adult_Calories <- Adult$Calories[1]
+
+ggplot(Smoothies_Shakes_MC, aes(x = Item)) +
+  geom_bar(aes(y = Calories), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+  geom_bar(aes(y = Adult_Calories), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+  labs(title = "Smoothies_Shakes Calorie Comparison", x = "Item", y = "Calories") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max(Smoothies_Shakes_MC$Adult_Calories) + 200)) +
+  geom_text(aes(y = Calories, label = Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  geom_text(aes(y = Adult_Calories, label = Adult_Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Legend", labels = c("Item", "Average Adult")) +
+  coord_flip() 
+
+Smoothies_Shakes_MC <- dplyr::select(Smoothies_Shakes_MC, -Adult_Calories)
+
+###############################################################
+# Smoothies_Shakes
+Desserts_MC$Adult_Calories <- Adult$Calories[1]
+
+ggplot(Desserts_MC, aes(x = Item)) +
+  geom_bar(aes(y = Calories), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+  geom_bar(aes(y = Adult_Calories), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+  labs(title = "Smoothies_Shakes Calorie Comparison", x = "Item", y = "Calories") +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, max(Desserts_MC$Adult_Calories) + 200)) +
+  geom_text(aes(y = Calories, label = Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  geom_text(aes(y = Adult_Calories, label = Adult_Calories), hjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Legend", labels = c("Item", "Average Adult")) +
+  coord_flip() 
+
+Desserts_MC <- dplyr::select(Desserts_MC, -Adult_Calories)
+
+```
+
+```{r}
+#####This chunk tried to find out if the average of the each category can meet the requirment for the healthy nutrition
+#Note the table is sorted from hightes to the lest
+
+factors <- c("Total_Fat","Saturated_Fat", "Sodium", "Carbohydrates", "Dietary_Fiber", "Sugars", "Protein")
+
+avg_df <- data.frame(Category = character(), stringsAsFactors = FALSE)
+
+for(factor in factors) {
+  
+  avg_factor <- c()
+  categories <- c()
+  
+  for(i in seq_along(list_of_dataframes)) {
+    new_name <- gsub(" ", "_", paste0(names(list_of_dataframes)[i], "_MC"))
+    new_name <- gsub("&_", "", new_name)
+    df <- get(new_name)
+    avg_factor <- c(avg_factor, mean(df[[factor]], na.rm = TRUE))
+    categories <- c(categories, new_name)}
+  
+  avg_factor_df <- data.frame(Category = categories, Average = avg_factor, Factor = factor)
+  avg_factor_df$Adult_Average <- Adult[[factor]][1]
+  avg_df <- rbind(avg_df, avg_factor_df)
+
+highest_avg_df <- avg_df %>%
+  arrange(desc(Average))
+print(highest_avg_df)
+
+# Plot
+
+p <- ggplot(avg_df, aes(x = Category)) +
+        geom_bar(aes(y = Average), stat = "identity", fill = "skyblue", width = 0.4, position = position_dodge()) +
+        geom_bar(aes(y = Adult_Average), stat = "identity", fill = "pink", width = 0.4, position = position_dodge()) +
+        facet_wrap(~Factor, scales = "free", nrow = 2) +
+        labs(title = "Average Nutritional Factors Comparison", x = "Category", y = "Average") +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        scale_y_continuous(limits = c(0, max(avg_df$Adult_Average, na.rm = TRUE) + 10)) +
+        geom_text(aes(y = Average, label = round(Average, 1)), vjust = -0.3, position = position_dodge(0.9)) +
+        geom_text(aes(y = Adult_Average, label = round(Adult_Average, 1)), vjust = -0.3, position = position_dodge(0.9)) +
+        scale_fill_discrete(name = "Legend", labels = c("Category", "Average Adult"))
+
+print(p)
+
+avg_df <- c()
+p <- c(0)
+
+}
+```
+
+```{r}
+######################Scatter plot between Calories and Calories from fat
+
+ggplot(MC, aes(x = Calories, y = `Calories_from_Fat`)) +
+  geom_point(color = "blue") +
+  labs(title = "Scatterplot: Calories vs Calories from Fat",
+       x = "Calories",
+       y = "Calories from Fat") +
+  theme_minimal()
+######################Top food contains trans fat
+
+top_10_trans_fat <- MC %>%
+  arrange(desc(`Trans_Fat`)) %>%
+  head(10)
+
+ggplot(top_10_trans_fat, aes(x = reorder(Item, `Trans_Fat`), y = `Trans_Fat`)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Top 10 Items with Highest Trans Fat",
+       x = "Item",
+       y = "Trans Fat") +
+  theme_minimal() +
+  coord_flip() +
+  theme(axis.text.x = element_text(size = 12))
+#####################Top foods contains Saturated Fat
+top_10_Saturated_Fat <- MC %>%
+  arrange(desc(`Saturated_Fat`)) %>%
+  head(10)
+
+ggplot(top_10_Saturated_Fat, aes(x = reorder(Item, `Saturated_Fat`), y = `Saturated_Fat`)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Top 10 Items with Highest Saturated Fat",
+       x = "Item",
+       y = "Saturated Fat") +
+  theme_minimal() +
+  coord_flip() +
+  theme(axis.text.x = element_text(size = 12))
+#####################Top foods contains Sugars
+top_10_Sugars <- MC %>%
+  arrange(desc(`Sugars`)) %>%
+  head(10)
+
+ggplot(top_10_Sugars, aes(x = reorder(Item, `Sugars`), y = `Sugars`)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Top 10 Items with Highest Sugars",
+       x = "Item",
+       y = "Saturated Fat") +
+  theme_minimal() +
+  coord_flip() +
+  theme(axis.text.x = element_text(size = 12))
+######################Scatter plot between Total fat and Carbohydrates
+
+ggplot(MC, aes(x = Total_Fat, y = `Carbohydrates`)) +
+  geom_point(color = "blue") +
+  labs(title = "Scatterplot: Total Fat vs Carbohydrates",
+       x = "Total Fat",
+       y = "Carbohydrates") +
+  theme_minimal()
+######################  Vitamin
+factors <- c('Vitamin_A','Vitamin_C','Calcium','Iron')
+avg_df <- data.frame(Category = character(), stringsAsFactors = FALSE)
+
+for(factor in factors) {
+  
+  avg_factor <- c()
+  categories <- c()
+  for(i in seq_along(list_of_dataframes)) {
+    new_name <- gsub(" ", "_", paste0(names(list_of_dataframes)[i], "_MC"))
+    new_name <- gsub("&_", "", new_name)
+    df <- get(new_name)
+    avg_factor <- c(avg_factor, mean(df[[factor]], na.rm = TRUE))
+    categories <- c(categories, new_name)}
+  
+  avg_factor_df <- data.frame(Category = categories, Average = avg_factor, Factor = factor)
+  avg_df <- rbind(avg_df, avg_factor_df)
+
+highest_avg_df <- avg_df %>%
+  arrange(desc(Average))
+print(highest_avg_df)
+avg_df <- c()
+
+}
+
+##############################draw comparsion bar graph
+# Plot
+
+factors <- c('Vitamin_A','Vitamin_C','Calcium','Iron')
+avg_df <- data.frame(Category = character(), stringsAsFactors = FALSE)
+
+for(factor in factors) {
+  avg_factor <- c()
+  categories <- c() 
+  for(i in seq_along(list_of_dataframes)) {
+    new_name <- gsub(" ", "_", paste0(names(list_of_dataframes)[i], "_MC"))
+    new_name <- gsub("&_", "", new_name)
+    df <- get(new_name)
+    avg_factor <- c(avg_factor, mean(df[[factor]], na.rm = TRUE))
+    categories <- c(categories, new_name) 
+  }
+  
+  avg_factor_df <- data.frame(Category = categories, Average = avg_factor, Factor = factor)
+  avg_df <- rbind(avg_df, avg_factor_df)
+}
+
+# Sort in descending order of Average and print
+highest_avg_df <- avg_df %>% arrange(desc(Average))
+print(highest_avg_df)
+
+# Plot
+ggplot(highest_avg_df, aes(x = Category, y = Average, fill = Factor)) +
+  geom_col(position = "dodge") +
+  labs(title = "Average Nutritional Factors Comparison", x = "Category", y = "Average") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(limits = c(0, max(highest_avg_df$Average, na.rm = TRUE) + 10)) +
+  geom_text(aes(label = round(Average, 1)), vjust = -0.3, position = position_dodge(0.9)) +
+  scale_fill_discrete(name = "Factor")
+
+
+```
+
